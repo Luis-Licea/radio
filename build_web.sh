@@ -32,7 +32,8 @@ echo "Finished: docs/${CRATE_NAME_SNAKE_CASE}.wasm"
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
   # Linux, ex: Fedora
-  xdg-open http://localhost:8080/index.html
+  xdg-open http://localhost:5500/docs/index.html
+  # xdg-open http://localhost:8080/index.html
 elif [[ "$OSTYPE" == "msys" ]]; then
   # Windows
   start http://localhost:8080/index.html
