@@ -3,7 +3,7 @@ use eframe::{egui, epi};
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
-pub struct TemplateApp {
+pub struct App {
     // Example stuff:
     label: String,
 
@@ -12,9 +12,9 @@ pub struct TemplateApp {
     value: f32,
 }
 
-impl Default for TemplateApp {
+impl Default for App {
     fn default() -> Self {
-        Self {
+        App {
             // Example stuff:
             label: "Hello World!".to_owned(),
             value: 2.7,
@@ -22,9 +22,9 @@ impl Default for TemplateApp {
     }
 }
 
-impl epi::App for TemplateApp {
+impl epi::App for App {
     fn name(&self) -> &str {
-        "eframe template"
+        "Online Radio"
     }
 
     /// Called once before the first frame.
@@ -86,10 +86,11 @@ impl epi::App for TemplateApp {
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 0.0;
-                    ui.label("powered by ");
+                    ui.label("Powered by ");
                     ui.hyperlink_to("egui", "https://github.com/emilk/egui");
                     ui.label(" and ");
                     ui.hyperlink_to("eframe", "https://github.com/emilk/egui/tree/master/eframe");
+                    ui.label(".");
                 });
             });
         });
@@ -97,12 +98,7 @@ impl epi::App for TemplateApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
 
-            ui.heading("eframe template");
-            ui.hyperlink("https://github.com/emilk/eframe_template");
-            ui.add(egui::github_link_file!(
-                "https://github.com/emilk/eframe_template/blob/master/",
-                "Source code."
-            ));
+            ui.heading("Online Radio");
             egui::warn_if_debug_build(ui);
         });
 

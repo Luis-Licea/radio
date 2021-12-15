@@ -1,6 +1,6 @@
 {
-    "name": "Egui Template PWA",
-    "short_name": "egui-template-pwa",
+    "name": "Online Radio",
+    "short_name": "Radio",
     "icons": [{
       "src": "./icon-256.png",
         "sizes": "256x256",
