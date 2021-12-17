@@ -1,8 +1,12 @@
+mod about_window;
+use about_window::AboutWindow;
 use eframe::{egui, epi};
 
-/// We derive Deserialize/Serialize so we can persist app state on shutdown.
-#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
+/// It derives Deserialize/Serialize so it can persist app state on shutdown.
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize,
+    serde::Serialize))]
+/// New fields are are given default values when deserializing old state.
+#[cfg_attr(feature = "persistence", serde(default))]
 pub struct App {
     // Example stuff:
     label: String,
@@ -10,19 +14,29 @@ pub struct App {
     // this how you opt-out of serialization of a member
     #[cfg_attr(feature = "persistence", serde(skip))]
     value: f32,
+
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    about_window: AboutWindow,
 }
 
+/// Implement trait to create default window.
 impl Default for App {
+
+    /// Create default window.
     fn default() -> Self {
         App {
             // Example stuff:
             label: "Hello World!".to_owned(),
             value: 2.7,
+            about_window: AboutWindow::default(),
         }
     }
 }
 
+/// Define function for running app natively and on web.
 impl epi::App for App {
+
+    /// Provides the name of the window.
     fn name(&self) -> &str {
         "Online Radio"
     }
@@ -49,10 +63,15 @@ impl epi::App for App {
         epi::set_value(storage, epi::APP_KEY, self);
     }
 
-    /// Called each time the UI needs repainting, which may be many times per second.
-    /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
-        let Self { label, value } = self;
+    /// Called each time the UI needs repainting, which may be many times per
+    /// second.  Put your widgets into a `SidePanel`, `TopPanel`,
+    /// `CentralPanel`, `Window` or `Area`.
+    fn update(&mut self, ctx: &egui::CtxRef,
+        frame: &mut epi::Frame<'_>) {
+        let Self { label, value, about_window } = self;
+
+        // Show the about window when the menu item is pressed.
+        about_window.update(ctx, frame);
 
         // Examples of how to create different panels and windows.
         // Pick whichever suits you.
@@ -62,9 +81,22 @@ impl epi::App for App {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
             egui::menu::bar(ui, |ui| {
+
+                // Add a menu bar category for the current file/page.
                 egui::menu::menu(ui, "File", |ui| {
+
+                    // Add a menu item for quitting the application.
                     if ui.button("Quit").clicked() {
                         frame.quit();
+                    }
+                });
+
+                // Add a menu bar category for showing iformation about the app.
+                egui::menu::menu(ui, "Help", |ui| {
+                    // Add a menu item for shoowing the information.
+                    if ui.button("About").clicked() {
+                        // Toggle the window on and off.
+                        self.about_window.is_open = !self.about_window.is_open;
                     }
                 });
             });
@@ -82,33 +114,15 @@ impl epi::App for App {
             if ui.button("Increment").clicked() {
                 *value += 1.0;
             }
-
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 0.0;
-                    ui.label("Powered by ");
-                    ui.hyperlink_to("egui", "https://github.com/emilk/egui");
-                    ui.label(" and ");
-                    ui.hyperlink_to("eframe", "https://github.com/emilk/egui/tree/master/eframe");
-                    ui.label(".");
-                });
-            });
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            // The central panel the region left after adding TopPanel's and SidePanel's
+
+            // The central panel the region left after adding TopPanel's and
+            // SidePanel's
 
             ui.heading("Online Radio");
             egui::warn_if_debug_build(ui);
         });
-
-        if false {
-            egui::Window::new("Window").show(ctx, |ui| {
-                ui.label("Windows can be moved by dragging them.");
-                ui.label("They are automatically sized based on contents.");
-                ui.label("You can turn on resizing and scrolling if you like.");
-                ui.label("You would normally chose either panels OR windows.");
-            });
-        }
     }
 }
