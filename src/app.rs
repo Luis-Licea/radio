@@ -3,8 +3,7 @@ use about_window::AboutWindow;
 use eframe::{egui, epi};
 
 /// It derives Deserialize/Serialize so it can persist app state on shutdown.
-#[cfg_attr(feature = "persistence", derive(serde::Deserialize,
-    serde::Serialize))]
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 /// New fields are are given default values when deserializing old state.
 #[cfg_attr(feature = "persistence", serde(default))]
 pub struct App {
@@ -21,7 +20,6 @@ pub struct App {
 
 /// Implement trait to create default window.
 impl Default for App {
-
     /// Create default window.
     fn default() -> Self {
         App {
@@ -35,7 +33,6 @@ impl Default for App {
 
 /// Define function for running app natively and on web.
 impl epi::App for App {
-
     /// Provides the name of the window.
     fn name(&self) -> &str {
         "Online Radio"
@@ -66,9 +63,12 @@ impl epi::App for App {
     /// Called each time the UI needs repainting, which may be many times per
     /// second.  Put your widgets into a `SidePanel`, `TopPanel`,
     /// `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::CtxRef,
-        frame: &mut epi::Frame<'_>) {
-        let Self { label, value, about_window } = self;
+    fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
+        let Self {
+            label,
+            value,
+            about_window,
+        } = self;
 
         // Show the about window when the menu item is pressed.
         about_window.update(ctx, frame);
@@ -81,10 +81,8 @@ impl epi::App for App {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
             egui::menu::bar(ui, |ui| {
-
                 // Add a menu bar category for the current file/page.
                 egui::menu::menu(ui, "File", |ui| {
-
                     // Add a menu item for quitting the application.
                     if ui.button("Quit").clicked() {
                         frame.quit();
@@ -117,7 +115,6 @@ impl epi::App for App {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-
             // The central panel the region left after adding TopPanel's and
             // SidePanel's
 
