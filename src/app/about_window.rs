@@ -2,6 +2,10 @@ use eframe::{egui, epi};
 
 /// The About window shows information about the application, such as creator
 /// names, source code links, and technologies used.
+/// It derives Deserialize/Serialize so it can persist app state on shutdown.
+#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
+/// New fields are are given default values when deserializing old state.
+#[cfg_attr(feature = "persistence", serde(default))]
 pub struct AboutWindow {
     /// Wether the window is open or closed.
     pub is_open: bool,
@@ -34,11 +38,11 @@ impl epi::App for AboutWindow {
             .show(ctx, |ui| {
                 // Display the name of the application.
                 ui.vertical_centered(|ui| {
-                    ui.heading("Online Radio");
+                    ui.heading("ℹ Online Radio");
                 });
 
                 // Display the name of the creators.
-                ui.label("Created by Luis David Licea Torres.");
+                ui.label("🔨 Created by Luis David Licea Torres.");
 
                 // Display the source code link.
                 ui.horizontal(|ui| {
@@ -46,7 +50,7 @@ impl epi::App for AboutWindow {
                     // hyperlinks are next to each other.
                     ui.spacing_mut().item_spacing.x = 0.0;
 
-                    ui.label("Source code available at ");
+                    ui.label(" Source code available at ");
                     ui.hyperlink_to(
                         "github.com/Luis-Licea/radio",
                         "https://github.com/Luis-Licea/radio",
@@ -61,7 +65,7 @@ impl epi::App for AboutWindow {
                     // hyperlinks are next to each other.
                     ui.spacing_mut().item_spacing.x = 0.0;
 
-                    ui.label("Powered by ");
+                    ui.label("🔥 Powered by ");
                     ui.hyperlink_to("egui", "https://github.com/emilk/egui");
                     ui.label(" and ");
                     ui.hyperlink_to("eframe", "https://github.com/emilk/egui/tree/master/eframe");
