@@ -1,6 +1,8 @@
 mod about_window;
+mod vlc_media_player;
 use about_window::AboutWindow;
 use eframe::{egui, epi};
+use vlc_media_player::VLCMediaPlayer;
 
 /// Debug and PartialEq are needed to print and use enums.
 #[derive(Debug, PartialEq)]
@@ -22,18 +24,21 @@ pub struct App {
     text_to_search: String,
 
     /// The volume level shown at all times.
-    volume_on_slider: u32,
+    volume_on_slider: i32,
 
     /// The volume level stored before muting the volume.
-    volume_before_mute: u32,
+    volume_before_mute: i32,
 
     /// The About window shown in the menu bar.
     about_window: AboutWindow,
 
-    /// Whether an station is playing or not.
-    is_playing: bool,
+    /// The VLC media player for playing URLs.
+    vlc_media_player: VLCMediaPlayer,
 
-    /// Whether the user settings panel is open or not.
+    /// Whether an station is playing or not.
+    playing_icon: String,
+
+    /// Wether the user settings panel is open or not.
     user_settings_is_open: bool,
 
     /// The user interface language.
@@ -44,8 +49,8 @@ pub struct App {
 impl Default for App {
     /// Create default window.
     fn default() -> Self {
-        // Initial volume.
-        let volume: u32 = 50;
+        // Initial media player volume.
+        let volume = 50;
         App {
             /// The text shows a hint by default.
             text_to_search: "Search...".to_owned(),
@@ -55,8 +60,10 @@ impl Default for App {
             volume_before_mute: volume,
             /// Creates a default About window.
             about_window: AboutWindow::default(),
-            /// No stations should play music at startup.
-            is_playing: false,
+            /// Creates a VLC media player.
+            vlc_media_player: VLCMediaPlayer::new(volume),
+            // Set the playing icon as the default icon.
+            playing_icon: "▶".to_owned(),
             /// The user settings panel should be closed by default.
             user_settings_is_open: false,
             /// Set the default language to English.
@@ -103,7 +110,8 @@ impl epi::App for App {
             volume_on_slider,
             volume_before_mute,
             about_window,
-            is_playing,
+            vlc_media_player,
+            playing_icon,
             user_settings_is_open,
             language,
         } = self;
@@ -177,14 +185,21 @@ impl epi::App for App {
 
         // Create a bottom pannel. The top/bottom/side panels must be drawn
         // before the central panel.
-        egui::TopBottomPanel::bottom("bottom_pane").show(ctx, |ui| {
+        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                // Chose correct playing icon based.
-                let playing_icon = if *is_playing { "▶" } else { "⏸" };
-
                 // Toggle play/pause when the play/pause icon is clicked.
-                if ui.button(playing_icon).clicked() {
-                    *is_playing = !*is_playing;
+                if ui.button(&playing_icon).clicked() {
+                    // Chose correct playing icon based on whether the player is playing.
+                    match vlc_media_player.toggle_play_and_get_is_playing() {
+                        // If not playing, show the play button.
+                        false => *playing_icon = "▶".to_owned(),
+                        // If playing, show the pause button and play the URL.
+                        true => {
+                            *playing_icon = "⏸".to_owned();
+                            vlc_media_player
+                                .play_url("https://ice5.somafm.com/dubstep-128-mp3".to_owned());
+                        }
+                    }
                 }
 
                 // Chose correct volume icon based on volume level.
@@ -213,8 +228,16 @@ impl epi::App for App {
                         *volume_on_slider = *volume_before_mute;
                     }
                 }
-                // Display a volume slider.
-                ui.add(egui::Slider::new(volume_on_slider, 0..=100).show_value(false));
+
+                // Display a volume slider, and change the volume when the
+                // slider is clicked or dragged.
+                if ui
+                    .add(egui::Slider::new(volume_on_slider, 0..=100).show_value(false))
+                    .is_pointer_button_down_on()
+                {
+                    vlc_media_player.set_volume(*volume_on_slider);
+                }
+
                 // Display artist and song name.
                 ui.label("Artist Name - Song Name");
 

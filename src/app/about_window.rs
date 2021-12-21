@@ -5,7 +5,7 @@ use eframe::{egui, epi};
 /// It derives Deserialize/Serialize so it can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
 /// New fields are are given default values when deserializing old state.
-#[cfg_attr(feature = "persistence", serde(default))]
+// #[cfg_attr(feature = "persistence", serde(default))]
 pub struct AboutWindow {
     /// Wether the window is open or closed.
     pub is_open: bool,
