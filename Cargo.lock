@@ -1169,11 +1169,12 @@ dependencies = [
 
 [[package]]
 name = "radio"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "eframe",
  "serde",
  "vlc-rs",
+ "web-sys",
 ]
 
 [[package]]

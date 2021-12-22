@@ -1,3 +1,5 @@
+// The following code is only compiled when the target is NOT webassembly.
+
 // Use atomic data types for exchanging data between the main thread and player
 // thread thread-safely.
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
@@ -7,7 +9,7 @@ use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::Arc;
 /// Use threads from the standard library to create a separate thread for the
 /// music player. The player needs its own thread or else it will block the GUI.
-use std::thread::{self};
+use std::thread;
 /// Use VLC as the media player.
 use vlc::{Instance, Media, MediaPlayer, MediaPlayerAudioEx};
 
@@ -22,6 +24,8 @@ pub struct VLCMediaPlayer {
     // Integer representing the volume after it was changed by the user. The
     // volume should be between 0 and 100, where 0 represents the mute state.
     volume: Arc<AtomicI32>,
+    // The url corresponding to the station that will be streamed.
+    url: String,
 }
 
 impl VLCMediaPlayer {
@@ -38,11 +42,14 @@ impl VLCMediaPlayer {
             is_volume_changed: Arc::new(AtomicBool::new(false)),
             // The default volume is 50, where 0 is mute and 100 is the max.
             volume: Arc::new(AtomicI32::new(volume)),
+            // The url that will be streamed is empty by default.
+            url: "".to_string(),
         }
     }
 
-    /// Play media from a valid URL or media resource location.
-    pub fn play_url(&mut self, url_to_play: String) {
+    /// Play media from a valid URL or media resource location. Set the url
+    /// before playing it.
+    pub fn play_url(&mut self) {
         // NOTE: Using Arc and atomics were nedded to prevent unsafe code.
 
         // Atomics: exchanging data between the main/player threads thread-safely.
@@ -55,6 +62,8 @@ impl VLCMediaPlayer {
         let is_playing: Arc<AtomicBool> = Arc::clone(&self.is_playing);
         let is_volume_changed: Arc<AtomicBool> = Arc::clone(&self.is_volume_changed);
         let volume: Arc<AtomicI32> = Arc::clone(&self.volume);
+        // Make a string slice that so that the thread can take ownership of it.
+        let url = self.url.to_string();
 
         // Use threads from the standard library to create a separate thread for the
         // music player. The player needs its own thread or else it will block the GUI.
@@ -66,9 +75,7 @@ impl VLCMediaPlayer {
             let media_player = MediaPlayer::new(&instance).unwrap();
 
             // Create media from URL.
-            let media = Media::new_location(&instance, &url_to_play).unwrap();
-
-            // TODO: Return metadata.
+            let media = Media::new_location(&instance, &url).unwrap();
 
             // Set the URL to play.
             media_player.set_media(&media);
@@ -99,25 +106,35 @@ impl VLCMediaPlayer {
         });
     }
 
-    pub fn toggle_play_and_get_is_playing(&mut self) -> bool {
-        // Get the new playing state by applying NOT to the previous state.
-        let toggled_state = !self.is_playing.load(Ordering::Relaxed);
-        // Store the new playing state.
-        self.is_playing.store(toggled_state, Ordering::Relaxed);
-        // Return the new playing state.
-        toggled_state
+    /// Save the URL that will be played.
+    pub fn set_src(&mut self, url: &str) {
+        self.url = url.to_string();
     }
 
+    /// Stop the media player.
+    pub fn play(&mut self) {
+        // Store the new playing state.
+        self.is_playing.store(true, Ordering::Relaxed);
+        self.play_url();
+    }
+
+    /// Start the media player.
+    pub fn pause(&mut self) {
+        // Store the new playing state.
+        self.is_playing.store(false, Ordering::Relaxed);
+    }
+
+    /// Set the volume level, which should be between 0 and 100.
     pub fn set_volume(&mut self, volume: i32) {
         // Validate that the volume is between 0 and 100.
         let volume = VLCMediaPlayer::validate_volume(volume);
         // Set the volume target.
-        self.volume.store(volume, Ordering::SeqCst);
+        self.volume.store(volume, Ordering::Relaxed);
         // Flag for a neededed volume change.
-        self.is_volume_changed.store(true, Ordering::SeqCst);
+        self.is_volume_changed.store(true, Ordering::Relaxed);
     }
 
-    /// Returns the volme if it is between 0 and 100 and panics otherwise.
+    /// Return the volme if it is between 0 and 100 and panic otherwise.
     fn validate_volume(volume: i32) -> i32 {
         match volume {
             // Validate that the volume is between 0 and 100.

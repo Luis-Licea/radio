@@ -1,6 +1,6 @@
 [package]
 name = "radio"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Luis David Licea Torres <luisliceatorres@gmail.com>"]
 edition = "2021"
 
@@ -11,21 +11,25 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# The media player used to play radio stations from URLs.
-vlc-rs = "0.3"
-# The egui, epi and web+native backends.
+# Provides egui, epi, web, and native backends.
 eframe = "0.15.0"
-
+# Provides serialization and deserialization.
 serde = { version = "1", features = ["derive"], optional = true }
-
+# Provides audio playback of URLs when compiling natively.
+vlc-rs = "0.3"
+# Provides audio playback when compiling for webassembly.
+web-sys = { version = "0.3.55", features = [
+  "HtmlAudioElement",
+  "HtmlMediaElement",
+] }
 
 [features]
 default = []
-# Enable if you want to persist app state on shutdown.
+# Provides persistence of app state on shutdown.
 persistence = ["eframe/persistence", "serde"]
 
 [profile.release]
-# Fast and small wasm.
+# Provides a fast and small wasm.
 opt-level = 2
 
 [patch.crates-io]

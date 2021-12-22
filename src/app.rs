@@ -1,8 +1,15 @@
 mod about_window;
+/// Use VLC media player when compiling natively.
+#[cfg(not(target_arch = "wasm32"))]
 mod vlc_media_player;
 use about_window::AboutWindow;
 use eframe::{egui, epi};
+/// Use VLC media player when compiling natively.
+#[cfg(not(target_arch = "wasm32"))]
 use vlc_media_player::VLCMediaPlayer;
+/// Use Web-sys media player when compiling webassembly.
+#[cfg(target_arch = "wasm32")]
+use web_sys::HtmlAudioElement;
 
 /// Debug and PartialEq are needed to print and use enums.
 #[derive(Debug, PartialEq)]
@@ -20,6 +27,9 @@ enum Language {
 /// New fields are are given default values when deserializing old state.
 #[cfg_attr(feature = "persistence", serde(default))]
 pub struct App {
+    /// The station URL that will be streamed.
+    station_url: String,
+
     /// The string used to search for station names.
     text_to_search: String,
 
@@ -32,11 +42,20 @@ pub struct App {
     /// The About window shown in the menu bar.
     about_window: AboutWindow,
 
-    /// The VLC media player for playing URLs.
-    vlc_media_player: VLCMediaPlayer,
+    /// Use VLC for playing URLs when compiling natively.
+    /// Opt-out of serialization for the VLC media player.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    media_player: VLCMediaPlayer,
 
-    /// Whether an station is playing or not.
-    playing_icon: String,
+    /// Use Web-sys for playing URLs when compiling webassembly.
+    /// Opt-out of serialization for the Web-sys media player.
+    #[cfg(target_arch = "wasm32")]
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    media_player: HtmlAudioElement,
+
+    /// Wether an station is playing or not.
+    playing_icon: char,
 
     /// Wether the user settings panel is open or not.
     user_settings_is_open: bool,
@@ -52,20 +71,35 @@ impl Default for App {
         // Initial media player volume.
         let volume = 50;
         App {
+            /// By default play a dubstep station.
+            station_url: "https://ice5.somafm.com/dubstep-128-mp3".to_owned(),
+
             /// The text shows a hint by default.
-            text_to_search: "Search...".to_owned(),
+            text_to_search: "".to_owned(),
+
             /// Set the initial slider volume.
             volume_on_slider: volume,
+
             /// Set the initial volume before muting.
             volume_before_mute: volume,
+
             /// Creates a default About window.
             about_window: AboutWindow::default(),
+
             /// Creates a VLC media player.
-            vlc_media_player: VLCMediaPlayer::new(volume),
+            /// Use VLC for playing URLs when compiling natively.
+            #[cfg(not(target_arch = "wasm32"))]
+            media_player: VLCMediaPlayer::new(volume),
+            /// Use Web-sys for playing URLs when compiling webassembly.
+            #[cfg(target_arch = "wasm32")]
+            media_player: HtmlAudioElement::new().unwrap(),
+
             // Set the playing icon as the default icon.
-            playing_icon: "▶".to_owned(),
+            playing_icon: '▶',
+
             /// The user settings panel should be closed by default.
             user_settings_is_open: false,
+
             /// Set the default language to English.
             language: Language::English,
         }
@@ -106,11 +140,12 @@ impl epi::App for App {
     /// `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
         let Self {
+            station_url,
             text_to_search,
             volume_on_slider,
             volume_before_mute,
             about_window,
-            vlc_media_player,
+            media_player,
             playing_icon,
             user_settings_is_open,
             language,
@@ -158,16 +193,16 @@ impl epi::App for App {
                 ui.heading("Online Radio");
                 // Add magnifying glass to decorate search bar.
                 ui.heading("🔍");
-                // Add a search bar to search for stations.
-                let response = ui.text_edit_singleline(text_to_search);
-
-                // If search bar is showing hint when clicked, then remove hint.
-                if response.clicked() && (*text_to_search).eq("Search...") {
-                    *text_to_search = "".to_owned();
-                // If the search field is empty, show hint.
-                } else if response.lost_focus() && (*text_to_search).eq("") {
-                    *text_to_search = "Search...".to_owned();
-                }
+                // Calculate the button width. This will be used for spacing.
+                let button_width = ui.spacing().interact_size.x;
+                // Calculate the available width.
+                let width = ui.available_width();
+                // Add a search bar to search for stations. Adjust search bar width based on available wdith.
+                ui.add(
+                    egui::TextEdit::singleline(text_to_search)
+                        .desired_width(width - button_width * 1.6)
+                        .hint_text("Search..."),
+                );
 
                 // Add a login button.
                 if ui.button("👤").clicked() {
@@ -183,22 +218,34 @@ impl epi::App for App {
             });
         });
 
+        // TODO: Query radio stations.
+        let mut url = vec![
+            "https://ice5.somafm.com/dubstep-128-mp3",
+            "http://stream.radioparadise.com/aac-128",
+        ];
+
         // Create a bottom pannel. The top/bottom/side panels must be drawn
         // before the central panel.
         egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 // Toggle play/pause when the play/pause icon is clicked.
-                if ui.button(&playing_icon).clicked() {
-                    // Chose correct playing icon based on whether the player is playing.
-                    match vlc_media_player.toggle_play_and_get_is_playing() {
+                if ui.button(*playing_icon).clicked() {
+                    // Chose correct playing icon and playing state based on the icon.
+                    // The logic seems reversed here, but it is really not.
+                    *playing_icon = match playing_icon {
                         // If not playing, show the play button.
-                        false => *playing_icon = "▶".to_owned(),
-                        // If playing, show the pause button and play the URL.
-                        true => {
-                            *playing_icon = "⏸".to_owned();
-                            vlc_media_player
-                                .play_url("https://ice5.somafm.com/dubstep-128-mp3".to_owned());
+                        '⏸' => {
+                            let _ = media_player.pause();
+                            '▶'
                         }
+                        // If playing, show the pause button and play the URL.
+                        '▶' => {
+                            media_player.set_src(station_url);
+                            let _ = media_player.play();
+                            '⏸'
+                        }
+                        // Return the same icon.
+                        _ => *playing_icon,
                     }
                 }
 
@@ -227,6 +274,12 @@ impl epi::App for App {
                         // Retrieve the last current volume level.
                         *volume_on_slider = *volume_before_mute;
                     }
+                    #[cfg(target_arch = "wasm32")]
+                    // Web-sys takes volme as a float in the range 0.0 to 1.0.
+                    media_player.set_volume(*volume_on_slider as f64 / 100.0);
+                    #[cfg(not(target_arch = "wasm32"))]
+                    // VLC takes volme as an integer in the range 0 to 100.
+                    media_player.set_volume(*volume_on_slider);
                 }
 
                 // Display a volume slider, and change the volume when the
@@ -235,12 +288,28 @@ impl epi::App for App {
                     .add(egui::Slider::new(volume_on_slider, 0..=100).show_value(false))
                     .is_pointer_button_down_on()
                 {
-                    vlc_media_player.set_volume(*volume_on_slider);
+                    #[cfg(target_arch = "wasm32")]
+                    // Web-sys takes volme as a float in the range 0.0 to 1.0.
+                    media_player.set_volume(*volume_on_slider as f64 / 100.0);
+                    #[cfg(not(target_arch = "wasm32"))]
+                    // VLC takes volme as an integer in the range 0 to 100.
+                    media_player.set_volume(*volume_on_slider);
                 }
 
                 // Display artist and song name.
                 ui.label("Artist Name - Song Name");
 
+                /*
+                // Calculate the button width. This will be used for spacing.
+                let button_width = ui.spacing().interact_size.x;
+                // Calculate the available width.
+                let width = ui.available_width();
+
+                // let x = ui.spacing().interact_size.x * 1.5 + ui.spacing().slider_width
+                // ui.add_space(width - 4.0 * button_width);
+
+                // TODO: add more functionality and make consider small phone screen sizes.
+                // Also, vote for each station whenever it is played.
                 // Add button that copies artist and song name.
                 if ui.button("📋").clicked() {
                     // Copy song title.
@@ -251,6 +320,7 @@ impl epi::App for App {
                 if ui.button("🎶").clicked() {}
                 // Add an options button.
                 if ui.button("📻").clicked() {}
+                */
             });
         });
 
@@ -258,7 +328,44 @@ impl epi::App for App {
         // side panels.
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::warn_if_debug_build(ui);
-            if ui.button("👍").clicked() {}
+
+            // Add a scroll area so the user can scroll through the stations.
+            egui::ScrollArea::vertical()
+                .max_width(f32::INFINITY)
+                .show(ui, |ui| {
+                    // Add a grid where the stations will be placed.
+                    egui::Grid::new("stations").striped(true).show(ui, |ui| {
+                        // For every URL in the vector:
+                        for (i, link) in url.iter_mut().enumerate() {
+                            // Create a group of components that will represent a link to a station.
+                            ui.group(|ui| {
+                                // Place the widgets horizontally.
+                                ui.horizontal(|ui| {
+                                    // Add a play button for the station.
+                                    if ui.button("▶").clicked() {
+                                        // Update the playing icon.
+                                        *playing_icon = '⏸';
+
+                                        // Set the station URL to be streamed.
+                                        *station_url = link.to_string();
+
+                                        // Pass the URL to the station.
+                                        media_player.set_src(station_url);
+
+                                        // Play the station.
+                                        let _ = media_player.play();
+                                    }
+                                    // Give a number to each station.
+                                    ui.label(format!("Station {}", i));
+                                });
+                                // Show the link for each station.
+                                ui.hyperlink_to(link.to_string(), link);
+                            });
+                            // End the grid row.
+                            ui.end_row();
+                        }
+                    });
+                });
 
             // If the user settings panel is open:
             if *user_settings_is_open {
