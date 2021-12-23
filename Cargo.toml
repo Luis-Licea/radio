@@ -15,9 +15,13 @@ crate-type = ["cdylib", "rlib"]
 eframe = "0.15.0"
 # Provides serialization and deserialization.
 serde = { version = "1", features = ["derive"], optional = true }
+
 # Provides audio playback of URLs when compiling natively.
-vlc-rs = "0.3"
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+vlc-rs = { version = "0.3", default-features = false }
+
 # Provides audio playback when compiling for webassembly.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "0.3.55", features = [
   "HtmlAudioElement",
   "HtmlMediaElement",

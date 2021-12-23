@@ -10,7 +10,8 @@ use std::sync::Arc;
 /// Use threads from the standard library to create a separate thread for the
 /// music player. The player needs its own thread or else it will block the GUI.
 use std::thread;
-/// Use VLC as the media player.
+/// Use VLC media player when compiling natively.
+#[cfg(not(target_arch = "wasm32"))]
 use vlc::{Instance, Media, MediaPlayer, MediaPlayerAudioEx};
 
 /// A thread-safe VLC media player with basic functionality such as stopping and

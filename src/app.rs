@@ -352,6 +352,9 @@ impl epi::App for App {
                                         // Pass the URL to the station.
                                         media_player.set_src(station_url);
 
+                                        // Stop the station in case it is playing.
+                                        let _ = media_player.pause();
+
                                         // Play the station.
                                         let _ = media_player.play();
                                     }
