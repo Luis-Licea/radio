@@ -1169,11 +1169,10 @@ dependencies = [
 
 [[package]]
 name = "radio"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "eframe",
  "serde",
- "vlc-rs",
  "web-sys",
 ]
 
@@ -1410,15 +1409,6 @@ name = "version_check"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5fecdca9a5291cc2b8dcf7dc02453fee791a280f3743cb0905f8822ae463b3fe"
-
-[[package]]
-name = "vlc-rs"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6223b2d4a7b2977e0758cbff1cb00df37236f91de4593da47f8a2737ac59a96e"
-dependencies = [
- "libc",
-]
 
 [[package]]
 name = "walkdir"

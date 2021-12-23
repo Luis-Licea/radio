@@ -1,14 +1,6 @@
 mod about_window;
-/// Use VLC media player when compiling natively.
-#[cfg(not(target_arch = "wasm32"))]
-mod vlc_media_player;
 use about_window::AboutWindow;
 use eframe::{egui, epi};
-/// Use VLC media player when compiling natively.
-#[cfg(not(target_arch = "wasm32"))]
-use vlc_media_player::VLCMediaPlayer;
-/// Use Web-sys media player when compiling webassembly.
-#[cfg(target_arch = "wasm32")]
 use web_sys::HtmlAudioElement;
 
 /// Debug and PartialEq are needed to print and use enums.
@@ -42,15 +34,7 @@ pub struct App {
     /// The About window shown in the menu bar.
     about_window: AboutWindow,
 
-    /// Use VLC for playing URLs when compiling natively.
-    /// Opt-out of serialization for the VLC media player.
-    #[cfg(not(target_arch = "wasm32"))]
-    #[cfg_attr(feature = "persistence", serde(skip))]
-    media_player: VLCMediaPlayer,
-
-    /// Use Web-sys for playing URLs when compiling webassembly.
     /// Opt-out of serialization for the Web-sys media player.
-    #[cfg(target_arch = "wasm32")]
     #[cfg_attr(feature = "persistence", serde(skip))]
     media_player: HtmlAudioElement,
 
@@ -86,12 +70,7 @@ impl Default for App {
             /// Creates a default About window.
             about_window: AboutWindow::default(),
 
-            /// Creates a VLC media player.
-            /// Use VLC for playing URLs when compiling natively.
-            #[cfg(not(target_arch = "wasm32"))]
-            media_player: VLCMediaPlayer::new(volume),
             /// Use Web-sys for playing URLs when compiling webassembly.
-            #[cfg(target_arch = "wasm32")]
             media_player: HtmlAudioElement::new().unwrap(),
 
             // Set the playing icon as the default icon.
@@ -274,12 +253,8 @@ impl epi::App for App {
                         // Retrieve the last current volume level.
                         *volume_on_slider = *volume_before_mute;
                     }
-                    #[cfg(target_arch = "wasm32")]
                     // Web-sys takes volme as a float in the range 0.0 to 1.0.
                     media_player.set_volume(*volume_on_slider as f64 / 100.0);
-                    #[cfg(not(target_arch = "wasm32"))]
-                    // VLC takes volme as an integer in the range 0 to 100.
-                    media_player.set_volume(*volume_on_slider);
                 }
 
                 // Display a volume slider, and change the volume when the
@@ -288,12 +263,8 @@ impl epi::App for App {
                     .add(egui::Slider::new(volume_on_slider, 0..=100).show_value(false))
                     .is_pointer_button_down_on()
                 {
-                    #[cfg(target_arch = "wasm32")]
                     // Web-sys takes volme as a float in the range 0.0 to 1.0.
                     media_player.set_volume(*volume_on_slider as f64 / 100.0);
-                    #[cfg(not(target_arch = "wasm32"))]
-                    // VLC takes volme as an integer in the range 0 to 100.
-                    media_player.set_volume(*volume_on_slider);
                 }
 
                 // Display artist and song name.
