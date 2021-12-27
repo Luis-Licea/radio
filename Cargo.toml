@@ -1,6 +1,6 @@
 [package]
 name = "radio"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Luis David Licea Torres <luisliceatorres@gmail.com>"]
 edition = "2021"
 
@@ -14,19 +14,21 @@ crate-type = ["cdylib", "rlib"]
 # Provides egui, epi, web, and native backends.
 eframe = "0.15.0"
 # Provides serialization and deserialization.
-serde = { version = "1", features = ["derive"], optional = true }
-
+serde = { version = "1", features = ["derive"], optional = false }
 # Provides audio playback when compiling for webassembly.
 web-sys = { version = "0.3.55", features = [
   "HtmlAudioElement",
   "HtmlMediaElement",
 ] }
+# Provides JSON text to radio Station struct conversion.
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+# Provides the HTTP client used to make async radio station requests.
+ehttp = "0.1.0"
 
 [features]
 default = []
 # Provides persistence of app state on shutdown.
-persistence = ["eframe/persistence", "serde"]
-
+persistence = ["eframe/persistence"]
 [profile.release]
 # Provides a fast and small wasm.
 opt-level = 2

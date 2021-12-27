@@ -1,17 +1,56 @@
 mod about_window;
 use about_window::AboutWindow;
 use eframe::{egui, epi};
+use serde::Deserialize;
+use std::sync::{Arc, Mutex};
 use web_sys::HtmlAudioElement;
 
+/// Enumerate the user interface languages.
 /// Debug and PartialEq are needed to print and use enums.
 #[derive(Debug, PartialEq)]
 /// It derives Deserialize/Serialize so it can persist app state on shutdown.
 #[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
-/// Enumerate the user interface languages.
 enum Language {
     English,
     Spanish,
     Russian,
+}
+
+/// The dtata associated to a radio station (url, name, etc).
+// Deriving the deserialization and serialization features is done by the
+// serde_json dependency. These derivations allow JSON text to be converted into
+// a Station struct.
+#[derive(Deserialize, Debug)]
+pub struct Station {
+    pub stationuuid: String,
+    pub name: String,
+    pub url: String,
+    pub url_resolved: String,
+    pub homepage: String,
+    pub favicon: String,
+    pub tags: String,
+    pub country: String,
+    pub state: String,
+    pub language: String,
+    pub votes: i32,
+    pub lastchangetime: String,
+    pub codec: String,
+    pub bitrate: u32,
+    pub lastcheckoktime: String,
+    pub clicktimestamp: String,
+    pub clickcount: u32,
+    pub clicktrend: i32,
+}
+
+/// The download status.
+enum Download {
+    /// No downloads done or in progress.
+    None,
+    /// The download is in progress.
+    InProgress,
+    /// The download is done and the data is stored in the response, unless the
+    /// donwnload resulted in an error.
+    Done(Result<ehttp::Response, ehttp::Error>),
 }
 
 /// It derives Deserialize/Serialize so it can persist app state on shutdown.
@@ -19,6 +58,16 @@ enum Language {
 /// New fields are are given default values when deserializing old state.
 #[cfg_attr(feature = "persistence", serde(default))]
 pub struct App {
+    /// Stores stations as they are retrieved from the database.
+    /// Opt-out of serialization for downloads.
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    download: Arc<Mutex<Download>>,
+
+    /// The list of stations that was retrieved from the database.
+    /// Opt-out of serialization for stations.
+    #[cfg_attr(feature = "persistence", serde(skip))]
+    stations: Arc<Mutex<Vec<Station>>>,
+
     /// The station URL that will be streamed.
     station_url: String,
 
@@ -55,10 +104,16 @@ impl Default for App {
         // Initial media player volume.
         let volume = 50;
         App {
+            /// Initially there are no downloads.
+            download: Arc::new(Mutex::new(Download::None)),
+
+            // Initially the list of stations is empty.
+            stations: Arc::new(Mutex::new(Vec::new())),
+
             /// By default play a dubstep station.
             station_url: "https://ice5.somafm.com/dubstep-128-mp3".to_owned(),
 
-            /// The text shows a hint by default.
+            /// Initially there is no text to search.
             text_to_search: "".to_owned(),
 
             /// Set the initial slider volume.
@@ -119,6 +174,8 @@ impl epi::App for App {
     /// `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
         let Self {
+            download,
+            stations,
             station_url,
             text_to_search,
             volume_on_slider,
@@ -170,18 +227,57 @@ impl epi::App for App {
             ui.horizontal(|ui| {
                 // Show the website name.
                 ui.heading("Online Radio");
-                // Add magnifying glass to decorate search bar.
-                ui.heading("🔍");
+
+                // Create a flag that triggers the download of station from the
+                // database.
+                let mut trigger_fetch = false;
+
+                // Add magnifying glass that triggers radio station search.
+                trigger_fetch |= ui.button("🔍").clicked();
+
                 // Calculate the button width. This will be used for spacing.
                 let button_width = ui.spacing().interact_size.x;
-                // Calculate the available width.
+                // Calculate the available width. This will be used for spacing.
                 let width = ui.available_width();
-                // Add a search bar to search for stations. Adjust search bar width based on available wdith.
-                ui.add(
+                // Add a search bar to search for stations. Adjust search bar
+                // width based on available wdith.
+                let search = ui.add(
                     egui::TextEdit::singleline(text_to_search)
                         .desired_width(width - button_width * 1.6)
-                        .hint_text("Search..."),
+                        .hint_text("Search…"),
                 );
+
+                // The search bar triggers a radio station search whenever the
+                // user presses "Enter".
+                trigger_fetch |= search.lost_focus() && ui.input().key_pressed(egui::Key::Enter);
+
+                if trigger_fetch {
+                    // Search stations by name.
+                    // TODO: Use post method to specify more than one parameter.
+                    // TODO: Randomly choose a radio browser server to distribute load.
+                    let request = ehttp::Request::get(format!(
+                        "https://de1.api.radio-browser.info/json/stations/byname/{}?limit=100",
+                        text_to_search
+                    ));
+
+                    // Create a copy of the download that will be moved to another thread.
+                    let download_store = download.clone();
+
+                    // Set the download in progress.
+                    *download_store.lock().unwrap() = Download::InProgress;
+
+                    // Repaint the frame to show download in progress.
+                    let repaint_signal = frame.repaint_signal();
+
+                    // Fetch the request, and when done, process the response.
+                    ehttp::fetch(request, move |response| {
+                        // Set the download as done, and store the response.
+                        *download_store.lock().unwrap() = Download::Done(response);
+
+                        // Repaint the frame to show the download is done.
+                        repaint_signal.request_repaint();
+                    });
+                }
 
                 // Add a login button.
                 if ui.button("👤").clicked() {
@@ -197,15 +293,15 @@ impl epi::App for App {
             });
         });
 
-        // TODO: Query radio stations.
-        let mut url = vec![
-            "https://ice5.somafm.com/dubstep-128-mp3",
-            "http://stream.radioparadise.com/aac-128",
-        ];
-
         // Create a bottom pannel. The top/bottom/side panels must be drawn
         // before the central panel.
         egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+            // Display artist and song name.
+            ui.label("Artist Name - Song Name");
+
+            // Separate the artist and song names from the buttons.
+            ui.separator();
+
             ui.horizontal(|ui| {
                 // Toggle play/pause when the play/pause icon is clicked.
                 if ui.button(*playing_icon).clicked() {
@@ -267,9 +363,6 @@ impl epi::App for App {
                     media_player.set_volume(*volume_on_slider as f64 / 100.0);
                 }
 
-                // Display artist and song name.
-                ui.label("Artist Name - Song Name");
-
                 /*
                 // Calculate the button width. This will be used for spacing.
                 let button_width = ui.spacing().interact_size.x;
@@ -300,45 +393,87 @@ impl epi::App for App {
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::warn_if_debug_build(ui);
 
+            // Create a download guard.
+            let mut download_inner = download.lock().unwrap();
+
+            // Match the donwload state.
+            match &*download_inner {
+                // If no download, do nothing.
+                Download::None => {}
+                // If download in progress, show message.
+                Download::InProgress => {
+                    ui.label("Retrieving stations…");
+                }
+                // If the HTTP response is OK, process the text.
+                Download::Done(Ok(response)) => match response.text() {
+                    // If there is text, try to convert it into a vector of stations.
+                    Some(text) => match serde_json::from_str::<Vec<Station>>(&text) {
+                        // If the conversion is ok, save the vector of stations.
+                        Ok(stations_vector) => {
+                            // Store the stations.
+                            // TODO: Remove stations with same names and urls.
+                            *stations.lock().unwrap() = stations_vector;
+
+                            // Show there are no more downloads.
+                            *download_inner = Download::None;
+                        }
+                        // If the conversion produced an error, show the error message.
+                        Err(e) => {
+                            ui.label(e);
+                        }
+                    },
+                    // If there is no text, show a message.
+                    None => {
+                        ui.label("No stations.");
+                    }
+                },
+                // If the HTTP response had an error, show error message.
+                Download::Done(Err(err)) => {
+                    ui.label(err);
+                }
+            }
+
             // Add a scroll area so the user can scroll through the stations.
             egui::ScrollArea::vertical()
                 .max_width(f32::INFINITY)
                 .show(ui, |ui| {
                     // Add a grid where the stations will be placed.
-                    egui::Grid::new("stations").striped(true).show(ui, |ui| {
-                        // For every URL in the vector:
-                        for (i, link) in url.iter_mut().enumerate() {
-                            // Create a group of components that will represent a link to a station.
-                            ui.group(|ui| {
-                                // Place the widgets horizontally.
-                                ui.horizontal(|ui| {
-                                    // Add a play button for the station.
-                                    if ui.button("▶").clicked() {
-                                        // Update the playing icon.
-                                        *playing_icon = '⏸';
+                    egui::Grid::new("stations")
+                        .striped(true)
+                        .min_col_width(200.0)
+                        .show(ui, |ui| {
+                            // For every URL in the vector:
+                            for station in &*stations.lock().unwrap() {
+                                // Create a group of components that will represent a link to a station.
+                                ui.group(|ui| {
+                                    // Place the widgets horizontally.
+                                    ui.horizontal(|ui| {
+                                        // Add a play button for the station.
+                                        if ui.button("▶").clicked() {
+                                            // Update the playing icon.
+                                            *playing_icon = '⏸';
 
-                                        // Set the station URL to be streamed.
-                                        *station_url = link.to_string();
+                                            // Get the station URL to be streamed.
+                                            *station_url = station.url_resolved.to_string();
 
-                                        // Pass the URL to the station.
-                                        media_player.set_src(station_url);
+                                            // Pass the URL to the station.
+                                            media_player.set_src(station_url);
 
-                                        // Stop the station in case it is playing.
-                                        let _ = media_player.pause();
+                                            // Stop the station in case it is playing.
+                                            let _ = media_player.pause();
 
-                                        // Play the station.
-                                        let _ = media_player.play();
-                                    }
-                                    // Give a number to each station.
-                                    ui.label(format!("Station {}", i));
+                                            // Play the station.
+                                            // TODO: Allow player to play HTTP stations, not only HTTPS.
+                                            let _ = media_player.play();
+                                        }
+                                        // Give a number to each station.
+                                        ui.label(&station.name);
+                                    });
                                 });
-                                // Show the link for each station.
-                                ui.hyperlink_to(link.to_string(), link);
-                            });
-                            // End the grid row.
-                            ui.end_row();
-                        }
-                    });
+                                // End the grid row.
+                                ui.end_row();
+                            }
+                        });
                 });
 
             // If the user settings panel is open:
