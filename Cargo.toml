@@ -12,7 +12,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Provides egui, epi, web, and native backends.
-eframe = "0.15.0"
+eframe = "0.18.0"
 # Provides serialization and deserialization.
 serde = { version = "1", features = ["derive"], optional = false }
 # Provides audio playback when compiling for webassembly.
@@ -23,7 +23,7 @@ web-sys = { version = "0.3.55", features = [
 # Provides JSON text to radio Station struct conversion.
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 # Provides the HTTP client used to make async radio station requests.
-ehttp = "0.1.0"
+ehttp = "0.2.0"
 
 [features]
 default = []

@@ -1,6 +1,6 @@
 mod about_window;
 use about_window::AboutWindow;
-use eframe::{egui, epi};
+use eframe::egui;
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
 use web_sys::HtmlAudioElement;
@@ -58,6 +58,9 @@ enum Download {
 /// New fields are are given default values when deserializing old state.
 #[cfg_attr(feature = "persistence", serde(default))]
 pub struct App {
+    // The name of the window.
+    name: String,
+
     /// Stores stations as they are retrieved from the database.
     /// Opt-out of serialization for downloads.
     #[cfg_attr(feature = "persistence", serde(skip))]
@@ -98,12 +101,14 @@ pub struct App {
 }
 
 /// Implement trait to create default window.
-impl Default for App {
+impl App {
     /// Create default window.
-    fn default() -> Self {
+    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         // Initial media player volume.
         let volume = 50;
         App {
+            /// Name the application (the main window).
+            name: "Online Radio".to_owned(),
             /// Initially there are no downloads.
             download: Arc::new(Mutex::new(Download::None)),
 
@@ -141,39 +146,20 @@ impl Default for App {
 }
 
 /// Define function for running app natively and on web.
-impl epi::App for App {
-    /// Provides the name of the window.
-    fn name(&self) -> &str {
-        "Online Radio"
-    }
-
-    /// Called once before the first frame.
-    fn setup(
-        &mut self,
-        _ctx: &egui::CtxRef,
-        _frame: &mut epi::Frame<'_>,
-        _storage: Option<&dyn epi::Storage>,
-    ) {
-        // Load previous app state (if any).
-        // Note that you must enable the `persistence` feature for this to work.
-        #[cfg(feature = "persistence")]
-        if let Some(storage) = _storage {
-            *self = epi::get_value(storage, epi::APP_KEY).unwrap_or_default()
-        }
-    }
-
+impl eframe::App for App {
     /// Called by the frame work to save state before shutdown.
     /// Note that you must enable the `persistence` feature for this to work.
     #[cfg(feature = "persistence")]
-    fn save(&mut self, storage: &mut dyn epi::Storage) {
-        epi::set_value(storage, epi::APP_KEY, self);
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(storage, eframe::APP_KEY, self);
     }
 
     /// Called each time the UI needs repainting, which may be many times per
     /// second.  Put your widgets into a `SidePanel`, `TopPanel`,
     /// `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let Self {
+            name,
             download,
             stations,
             station_url,
@@ -201,7 +187,7 @@ impl epi::App for App {
                 // Add theme switch in menu bar.
                 egui::global_dark_light_mode_switch(ui);
                 // Add a menu bar category for the current file/page.
-                egui::menu::menu(ui, "File", |ui| {
+                ui.menu_button("File", |ui| {
                     // Add a menu item for quitting the application.
                     if ui.button("Quit").clicked() {
                         frame.quit();
@@ -209,7 +195,7 @@ impl epi::App for App {
                 });
 
                 // Add a menu bar category for showing iformation about the app.
-                egui::menu::menu(ui, "Help", |ui| {
+                ui.menu_button("Help", |ui| {
                     // Add a menu item for shoowing the information.
                     if ui.button("About").clicked() {
                         // Toggle the window on and off.
@@ -226,7 +212,7 @@ impl epi::App for App {
             // opposed to one below the other.
             ui.horizontal(|ui| {
                 // Show the website name.
-                ui.heading("Online Radio");
+                ui.heading(name.to_string());
 
                 // Create a flag that triggers the download of station from the
                 // database.
@@ -265,17 +251,10 @@ impl epi::App for App {
 
                     // Set the download in progress.
                     *download_store.lock().unwrap() = Download::InProgress;
-
-                    // Repaint the frame to show download in progress.
-                    let repaint_signal = frame.repaint_signal();
-
                     // Fetch the request, and when done, process the response.
                     ehttp::fetch(request, move |response| {
                         // Set the download as done, and store the response.
                         *download_store.lock().unwrap() = Download::Done(response);
-
-                        // Repaint the frame to show the download is done.
-                        repaint_signal.request_repaint();
                     });
                 }
 
@@ -304,7 +283,7 @@ impl epi::App for App {
 
             ui.horizontal(|ui| {
                 // Toggle play/pause when the play/pause icon is clicked.
-                if ui.button(*playing_icon).clicked() {
+                if ui.button(playing_icon.to_string()).clicked() {
                     // Chose correct playing icon and playing state based on the icon.
                     // The logic seems reversed here, but it is really not.
                     *playing_icon = match playing_icon {
@@ -419,7 +398,7 @@ impl epi::App for App {
                         }
                         // If the conversion produced an error, show the error message.
                         Err(e) => {
-                            ui.label(e);
+                            ui.label(e.to_string());
                         }
                     },
                     // If there is no text, show a message.

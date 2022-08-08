@@ -1,4 +1,4 @@
-use eframe::{egui, epi};
+use eframe::egui;
 
 /// The About window shows information about the application, such as creator
 /// names, source code links, and technologies used.
@@ -7,6 +7,9 @@ use eframe::{egui, epi};
 /// New fields are are given default values when deserializing old state.
 // #[cfg_attr(feature = "persistence", serde(default))]
 pub struct AboutWindow {
+    /// The name of the window.
+    name: String,
+
     /// Wether the window is open or closed.
     pub is_open: bool,
 }
@@ -16,6 +19,9 @@ impl Default for AboutWindow {
     /// Create default window.
     fn default() -> Self {
         AboutWindow {
+            // Name the About window.
+            name: "About".to_owned(),
+
             // Set the window closed by default.
             is_open: false,
         }
@@ -23,17 +29,12 @@ impl Default for AboutWindow {
 }
 
 /// Define function for running app natively and on web.
-impl epi::App for AboutWindow {
-    /// Provides the name of the window.
-    fn name(&self) -> &str {
-        "About"
-    }
-
+impl eframe::App for AboutWindow {
     /// Called each time the UI needs repainting
-    fn update(&mut self, ctx: &eframe::egui::CtxRef, _frame: &mut eframe::epi::Frame<'_>) {
+    fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
         // Create an About window. The window only pops up when the About menu
         // itme is pressed.
-        egui::Window::new(self.name())
+        egui::Window::new(self.name.to_string())
             .open(&mut self.is_open)
             .show(ctx, |ui| {
                 // Display the name of the application.
